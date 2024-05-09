@@ -91,8 +91,10 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
-
+vim.g.have_nerd_font = true
+vim.g.markdown_fenced_languages = {
+  'ts=typescript',
+}
 -- [[ Setting options ]]
 -- See `:help vim.opt`
 -- NOTE: You can change these options as you wish!
@@ -102,7 +104,7 @@ vim.g.have_nerd_font = false
 vim.opt.number = true
 -- You can also add relative line numbers, to help with jumping.
 --  Experiment for yourself to see if you like it!
--- vim.opt.relativenumber = true
+vim.opt.relativenumber = true
 
 -- Enable mouse mode, can be useful for resizing splits for example!
 vim.opt.mouse = 'a'
@@ -130,6 +132,7 @@ vim.opt.signcolumn = 'yes'
 
 -- Decrease update time
 vim.opt.updatetime = 250
+vim.opt.termguicolors = true
 
 -- Decrease mapped sequence wait time
 -- Displays which-key popup sooner
@@ -209,7 +212,6 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 local lazypath = vim.fn.stdpath 'data' .. '/lazy/lazy.nvim'
 if not vim.loop.fs_stat(lazypath) then
   local lazyrepo = 'https://github.com/folke/lazy.nvim.git'
-  vim.fn.system { 'git', 'clone', '--filter=blob:none', '--branch=stable', lazyrepo, lazypath }
 end ---@diagnostic disable-next-line: undefined-field
 vim.opt.rtp:prepend(lazypath)
 
@@ -227,6 +229,7 @@ vim.opt.rtp:prepend(lazypath)
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
+  { 'folke/neoconf.nvim', cmd = 'Neoconf' },
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
@@ -281,6 +284,7 @@ require('lazy').setup({
 
       -- Document existing key chains
       require('which-key').register {
+        ['<leader>b'] = { name = '[B]uffer', _ = 'which_key_ignore' },
         ['<leader>c'] = { name = '[C]ode', _ = 'which_key_ignore' },
         ['<leader>d'] = { name = '[D]ocument', _ = 'which_key_ignore' },
         ['<leader>r'] = { name = '[R]ename', _ = 'which_key_ignore' },
@@ -432,7 +436,7 @@ require('lazy').setup({
       -- LSP stands for Language Server Protocol. It's a protocol that helps editors
       -- and language tooling communicate in a standardized fashion.
       --
-      -- In general, you have a "server" which is some tool built to understand a particular
+      -- In general, you have a "server" ]hich is some tool built to understand a particular
       -- language (such as `gopls`, `lua_ls`, `rust_analyzer`, etc.). These Language Servers
       -- (sometimes called LSP servers, but that's kind of like ATM Machine) are standalone
       -- processes that communicate with some "client" - in this case, Neovim!
@@ -537,6 +541,21 @@ require('lazy').setup({
               vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
             end, '[T]oggle Inlay [H]ints')
           end
+          -- print(event.data.client_id)
+          local lspconfig = require 'lspconfig'
+          local is_in_deno_repo = lspconfig.util.root_pattern('deno.json', 'import_map.json', 'deno.jsonc')(vim.fn.getcwd())
+          local is_in_deno_part_of_repo = vim.fn.match(vim.fn.expand '%:p', 'supabase/functions') > -1
+          if is_in_deno_repo or is_in_deno_part_of_repo then
+            if client.name == 'tsserver' then
+              client.stop()
+              return
+            end
+          else
+            if client.name == 'denols' then
+              client.stop()
+              return
+            end
+          end
         end,
       })
 
@@ -565,9 +584,10 @@ require('lazy').setup({
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
-        -- clangd = {},
-        -- gopls = {},
-        -- pyright = {},
+        clangd = {},
+        gopls = {},
+        pyright = {},
+        denols = {},
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -575,7 +595,7 @@ require('lazy').setup({
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`tsserver`) will work just fine
-        -- tsserver = {},
+        tsserver = {},
         --
 
         lua_ls = {
@@ -812,6 +832,8 @@ require('lazy').setup({
       -- - sr)'  - [S]urround [R]eplace [)] [']
       require('mini.surround').setup()
 
+      require('mini.bufremove').setup()
+
       -- Simple and easy statusline.
       --  You could remove this setup call if you don't like it,
       --  and try some other statusline plugin
@@ -835,7 +857,7 @@ require('lazy').setup({
     'nvim-treesitter/nvim-treesitter',
     build = ':TSUpdate',
     opts = {
-      ensure_installed = { 'bash', 'c', 'html', 'lua', 'luadoc', 'markdown', 'vim', 'vimdoc' },
+      ensure_installed = { 'bash', 'c', 'html', 'lua', 'luadoc', 'markdown', 'vim', 'vimdoc', 'typescript', 'go', 'python' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -873,19 +895,19 @@ require('lazy').setup({
   --  Here are some example plugins that I've included in the Kickstart repository.
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
-  -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
+  require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.neo-tree',
+  require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
 }, {
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the
